@@ -5,7 +5,6 @@ let grayMat = null;
 let threshMat = null;
 let currentCorners = null;
 
-// Konfigurasi Grid pada Gambar Datar (Ukuran Standar 800 x 1000 Piksel)
 const GRID_CONFIG = {
     pg_left:  { startX: 100, startY: 340, rows: 5, cols: 5, boxW: 30, boxH: 25, spacingX: 45, spacingY: 30, options: ['A','B','C','D','E'] },
     pg_right: { startX: 450, startY: 340, rows: 5, cols: 5, boxW: 30, boxH: 25, spacingX: 45, spacingY: 30, options: ['A','B','C','D','E'] },
@@ -13,7 +12,6 @@ const GRID_CONFIG = {
     kategori: { startX: 100, startY: 710, rows: 5, cols: 3, boxW: 40, boxH: 25, spacingX: 65, spacingY: 30, options: ['B','S','B'] }
 };
 
-// Algoritma Mencari 4 Kotak Hitam di Setiap Pojok (Corner Markers)
 function find4CornerMarkers(thresh) {
     let contours = new cv.MatVector();
     let hierarchy = new cv.Mat();
@@ -25,20 +23,15 @@ function find4CornerMarkers(thresh) {
         let cnt = contours.get(i);
         let area = cv.contourArea(cnt);
         
-        // Filter luas area kotak hitam sudut
         if (area > 100 && area < 15000) {
             let rect = cv.boundingRect(cnt);
             let aspectRatio = rect.width / rect.height;
             let fillRatio = area / (rect.width * rect.height);
             
-            // Kotak hitam sudut memiliki rasio 1:1 (persegi) dan terisi pekat (>65%)
             if (aspectRatio >= 0.7 && aspectRatio <= 1.3 && fillRatio > 0.65) {
                 let M = cv.moments(cnt);
                 if (M.m00 !== 0) {
-                    candidates.push({
-                        x: M.m10 / M.m00,
-                        y: M.m01 / M.m00
-                    });
+                    candidates.push({ x: M.m10 / M.m00, y: M.m01 / M.m00 });
                 }
             }
         }
@@ -47,16 +40,12 @@ function find4CornerMarkers(thresh) {
     contours.delete();
     hierarchy.delete();
 
-    // Wajib terdeteksi minimal 4 kotak sudut
     if (candidates.length < 4) return null;
 
-    // Urutkan kandidat berdasarkan posisiY untuk memisahkan 2 atas dan 2 bawah
     candidates.sort((a, b) => a.y - b.y);
-    
-    let topTwo = candidates.slice(0, 2).sort((a, b) => a.x - b.x); // Top-Left, Top-Right
-    let bottomTwo = candidates.slice(-2).sort((a, b) => a.x - b.x); // Bottom-Left, Bottom-Right
+    let topTwo = candidates.slice(0, 2).sort((a, b) => a.x - b.x);
+    let bottomTwo = candidates.slice(-2).sort((a, b) => a.x - b.x);
 
-    // Kembalikan urutan: TL, TR, BR, BL
     return [topTwo[0], topTwo[1], bottomTwo[1], bottomTwo[0]];
 }
 
@@ -74,7 +63,6 @@ function scanFrame(videoElement, ctxOverlay, width, height) {
     srcMat.data.set(imageData.data);
 
     cv.cvtColor(srcMat, grayMat, cv.COLOR_RGBA2GRAY, 0);
-    // Thresholding untuk mempertegas warna hitam pekat kotak sudut
     cv.threshold(grayMat, threshMat, 100, 255, cv.THRESH_BINARY_INV);
 
     currentCorners = find4CornerMarkers(threshMat);
@@ -82,7 +70,6 @@ function scanFrame(videoElement, ctxOverlay, width, height) {
     ctxOverlay.clearRect(0, 0, width, height);
     
     if (currentCorners) {
-        // Gambarkan lingkaran hijau di ke-4 kotak sudut yang berhasil terkunci
         ctxOverlay.strokeStyle = "#00FF00";
         ctxOverlay.lineWidth = 3;
         ctxOverlay.beginPath();
@@ -102,10 +89,14 @@ function scanFrame(videoElement, ctxOverlay, width, height) {
             processStudentSheet();
         }
     } else {
-        // Panduan visual merah jika 4 kotak sudut belum pas di layar
         ctxOverlay.strokeStyle = "rgba(255, 0, 0, 0.4)";
         ctxOverlay.lineWidth = 2;
         ctxOverlay.strokeRect(width * 0.05, height * 0.05, width * 0.9, height * 0.9);
+
+        // Jika dalam kondisi paused (beku), tetap pertahankan overlay titik di layar
+        if (AppState.mode === 'paused' && currentCorners) {
+            drawOverlays(ctxOverlay, currentCorners);
+        }
     }
 }
 
@@ -144,9 +135,7 @@ function flattenPaper(sourceMat, corners) {
         corners[3].x, corners[3].y
     ]);
     
-    let dstTri = cv.matFromArray(4, 1, cv.CV_32FC2, [
-        0, 0, 800, 0, 800, 1000, 0, 1000
-    ]);
+    let dstTri = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, 800, 0, 800, 1000, 0, 1000]);
 
     let M = cv.getPerspectiveTransform(srcTri, dstTri);
     cv.warpPerspective(sourceMat, warpedMat, M, dsize);
@@ -197,9 +186,7 @@ function extractAnswersFromFlatImage(warpedMat) {
     let pg2 = readOMRGrid(threshWarp, GRID_CONFIG.pg_right, 'pg');
     
     let fullPG = { ...pg1 };
-    for (let no in pg2) {
-        fullPG[parseInt(no) + 5] = pg2[no];
-    }
+    for (let no in pg2) fullPG[parseInt(no) + 5] = pg2[no];
 
     let mcmaAnswers = readOMRGrid(threshWarp, GRID_CONFIG.mcma, 'mcma');
     let kategoriAnswers = readOMRGrid(threshWarp, GRID_CONFIG.kategori, 'kategori');
@@ -215,6 +202,7 @@ function extractAnswersFromFlatImage(warpedMat) {
     return { pg: fullPG, mcma: mappedMCMA, kategori: mappedKategori };
 }
 
+// Menghasilkan Titik Visual untuk PG (1-10), MCMA (11-15), & Kategori (16-20)
 function generateVisualOverlays(studentAnswers, masterKey) {
     let overlays = [];
 
@@ -227,21 +215,46 @@ function generateVisualOverlays(studentAnswers, masterKey) {
         }
     };
 
+    // 1. Overlay PG 1-5 & 6-10
     for (let r = 0; r < 5; r++) {
-        let noLeft = r + 1;
-        let noRight = r + 6;
-
-        if (masterKey.pg[noLeft]) addDot(GRID_CONFIG.pg_left, r, masterKey.pg[noLeft], '#FFFF00');
-        if (studentAnswers.pg[noLeft]) {
-            let col = (studentAnswers.pg[noLeft] === masterKey.pg[noLeft]) ? '#00FF00' : '#FF0000';
-            addDot(GRID_CONFIG.pg_left, r, studentAnswers.pg[noLeft], col);
+        let noL = r + 1, noR = r + 6;
+        if (masterKey.pg && masterKey.pg[noL]) addDot(GRID_CONFIG.pg_left, r, masterKey.pg[noL], '#FFFF00');
+        if (studentAnswers.pg && studentAnswers.pg[noL]) {
+            let col = (studentAnswers.pg[noL] === masterKey.pg[noL]) ? '#00FF00' : '#FF0000';
+            addDot(GRID_CONFIG.pg_left, r, studentAnswers.pg[noL], col);
         }
 
-        if (masterKey.pg[noRight]) addDot(GRID_CONFIG.pg_right, r, masterKey.pg[noRight], '#FFFF00');
-        if (studentAnswers.pg[noRight]) {
-            let col = (studentAnswers.pg[noRight] === masterKey.pg[noRight]) ? '#00FF00' : '#FF0000';
-            addDot(GRID_CONFIG.pg_right, r, studentAnswers.pg[noRight], col);
+        if (masterKey.pg && masterKey.pg[noR]) addDot(GRID_CONFIG.pg_right, r, masterKey.pg[noR], '#FFFF00');
+        if (studentAnswers.pg && studentAnswers.pg[noR]) {
+            let col = (studentAnswers.pg[noR] === masterKey.pg[noR]) ? '#00FF00' : '#FF0000';
+            addDot(GRID_CONFIG.pg_right, r, studentAnswers.pg[noR], col);
         }
+    }
+
+    // 2. Overlay MCMA (11-15)
+    for (let r = 0; r < 5; r++) {
+        let no = r + 11;
+        let masterArr = (masterKey.mcma && masterKey.mcma[no]) || [];
+        let studentArr = (studentAnswers.mcma && studentAnswers.mcma[no]) || [];
+
+        masterArr.forEach(ans => addDot(GRID_CONFIG.mcma, r, ans, '#FFFF00'));
+        studentArr.forEach(ans => {
+            let col = masterArr.includes(ans) ? '#00FF00' : '#FF0000';
+            addDot(GRID_CONFIG.mcma, r, ans, col);
+        });
+    }
+
+    // 3. Overlay Kategori (16-20)
+    for (let r = 0; r < 5; r++) {
+        let no = r + 16;
+        let masterArr = (masterKey.kategori && masterKey.kategori[no]) || [];
+        let studentArr = (studentAnswers.kategori && studentAnswers.kategori[no]) || [];
+
+        masterArr.forEach(ans => addDot(GRID_CONFIG.kategori, r, ans, '#FFFF00'));
+        studentArr.forEach(ans => {
+            let col = masterArr.includes(ans) ? '#00FF00' : '#FF0000';
+            addDot(GRID_CONFIG.kategori, r, ans, col);
+        });
     }
 
     return overlays;
@@ -249,7 +262,7 @@ function generateVisualOverlays(studentAnswers, masterKey) {
 
 function extractMasterKey() {
     if (!window.cvIsLoaded || !grayMat || !currentCorners) {
-        alert("Posisikan kamera sampai 4 lingkaran hijau mengunci kotak di setiap sudut!");
+        alert("Posisikan kamera sampai 4 lingkaran hijau mengunci kotak sudut!");
         return false;
     }
     
@@ -257,17 +270,27 @@ function extractMasterKey() {
     AppState.masterKey = extractAnswersFromFlatImage(flatMat);
     flatMat.delete();
 
+    // Buat Overlay Titik Kuning Kunci Master untuk Semua Soal
     AppState.overlayData = [];
-    for (let r = 0; r < 5; r++) {
-        let ansL = AppState.masterKey.pg[r + 1];
-        if (ansL) {
-            let c = GRID_CONFIG.pg_left.options.indexOf(ansL);
-            if (c !== -1) {
-                let cx = GRID_CONFIG.pg_left.startX + (c * GRID_CONFIG.pg_left.spacingX) + (GRID_CONFIG.pg_left.boxW / 2);
-                let cy = GRID_CONFIG.pg_left.startY + (r * GRID_CONFIG.pg_left.spacingY) + (GRID_CONFIG.pg_left.boxH / 2);
-                AppState.overlayData.push({ x: cx, y: cy, color: '#FFFF00' });
-            }
+    
+    const addYellow = (cfg, r, ans) => {
+        let c = cfg.options.indexOf(ans);
+        if (c !== -1) {
+            let cx = cfg.startX + (c * cfg.spacingX) + (cfg.boxW / 2);
+            let cy = cfg.startY + (r * cfg.spacingY) + (cfg.boxH / 2);
+            AppState.overlayData.push({ x: cx, y: cy, color: '#FFFF00' });
         }
+    };
+
+    for (let r = 0; r < 5; r++) {
+        if (AppState.masterKey.pg[r + 1]) addYellow(GRID_CONFIG.pg_left, r, AppState.masterKey.pg[r + 1]);
+        if (AppState.masterKey.pg[r + 6]) addYellow(GRID_CONFIG.pg_right, r, AppState.masterKey.pg[r + 6]);
+        
+        let mcmaArr = AppState.masterKey.mcma[r + 11] || [];
+        mcmaArr.forEach(ans => addYellow(GRID_CONFIG.mcma, r, ans));
+
+        let katArr = AppState.masterKey.kategori[r + 16] || [];
+        katArr.forEach(ans => addYellow(GRID_CONFIG.kategori, r, ans));
     }
 
     return true; 
@@ -275,6 +298,10 @@ function extractMasterKey() {
 
 function processStudentSheet() {
     AppState.mode = 'paused';
+    
+    // BEKUKAN TAMPILAN KAMERA PADA FRAME INI
+    const videoElement = document.getElementById('video-feed');
+    if (videoElement) videoElement.pause();
     
     let flatMat = flattenPaper(grayMat, currentCorners);
     let studentAnswers = extractAnswersFromFlatImage(flatMat);
@@ -289,6 +316,7 @@ function processStudentSheet() {
             }
         }).catch(err => {
             AppState.mode = 'student'; 
+            if (videoElement) videoElement.play();
         });
     } else {
         if (typeof calculateFinalScore === 'function') {
