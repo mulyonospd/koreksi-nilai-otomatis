@@ -5,12 +5,9 @@ cv['onRuntimeInitialized'] = () => {
     cvReady = true;
     console.log("OpenCV.js siap digunakan.");
     
-    // Logika UI baru: Menghilangkan loading dan memunculkan tombol
-    const loadingIndicator = document.getElementById('loading-indicator');
-    const btnLockMaster = document.getElementById('btn-lock-master');
-    if (loadingIndicator && btnLockMaster) {
-        loadingIndicator.style.display = 'none';
-        btnLockMaster.style.display = 'block';
+    // Memanggil fungsi notifikasi persentase selesai
+    if (typeof window.notifyCvReady === 'function') {
+        window.notifyCvReady();
     }
 };
 
