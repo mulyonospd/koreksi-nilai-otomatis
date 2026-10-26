@@ -196,9 +196,6 @@ function processStudentSheet(width, height) {
         AppState.mode = 'student'; 
     });
 }
-
-;
-
     // 3. Panggil fungsi OCR dari ocr.js untuk membaca nomor siswa di bagian atas kertas
     // Kita kirimkan potongan gambar (crop) khusus area isian Nomor
     extractNISFromImage().then((nis) => {
