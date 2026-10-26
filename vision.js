@@ -1,22 +1,12 @@
 // vision.js
 
-let cvReady = false;
-cv['onRuntimeInitialized'] = () => {
-    cvReady = true;
-    console.log("OpenCV.js siap digunakan.");
-    
-    // Memanggil fungsi notifikasi persentase selesai
-    if (typeof window.notifyCvReady === 'function') {
-        window.notifyCvReady();
-    }
-};
-
 let srcMat = null;
 let grayMat = null;
 let edgesMat = null;
 
 function scanFrame(videoElement, ctxOverlay, width, height) {
-    if (!cvReady) return; 
+    // Jika AI belum 100% siap dari index.html, jangan lakukan apa-apa
+    if (!window.cvIsLoaded) return; 
 
     if (!srcMat) {
         srcMat = new cv.Mat(height, width, cv.CV_8UC4);
@@ -99,7 +89,7 @@ function readOMRGrid(threshMat, startX, startY, rows, cols, boxW, boxH, spacingX
 }
 
 function extractMasterKey() {
-    if (!cvReady || !grayMat) {
+    if (!window.cvIsLoaded || !grayMat) {
         return false;
     }
     
