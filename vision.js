@@ -81,38 +81,123 @@ function detectPaperAlignment(contours, ctx, width, height) {
 }
 
 // Fungsi dipanggil saat tombol "Kunci Peta Jawaban" ditekan di app.js
-function extractMasterKey() {
-    // if (!cvReady || !grayMat) return false;
 
-    console.log("Memproses Kunci Jawaban Master...");
-    
-    // Logika OpenCV:
-    // 1. Lakukan pemotongan (crop) area tabel I, II, dan III
-    // 2. Loop setiap kotak opsi A, B, C, D, E.
-    // 3. Deteksi kepadatan piksel hitam / garis bersilang di dalam kotak tersebut.
-    
-    // Matriks data dummy (Sebagai cetak biru untuk dilanjutkan developer)
-    AppState.masterKey = {
-        pg: { 1: 'A', 2: 'C', 3: 'D', 4: 'B', 5: 'E' }, // dst...
-        mcma: { 11: ['A', 'C'], 12: ['B', 'D', 'E'] }, // dst...
-        kategori: { 16: ['B', 'S', 'B'], 17: ['S', 'B', 'S'] } // dst...
-    };
+// --- KODE PEMBACAAN PIKSEL ASLI (PENGGANTI BLUEPRINT) ---
 
-    return true; // Berhasil membaca
+// Fungsi bantuan untuk membaca grid jawaban (Menghitung jumlah tinta/tanda silang)
+function readOMRGrid(threshMat, startX, startY, rows, cols, boxW, boxH, spacingX, spacingY, isMultiAnswer = false) {
+    let result = {};
+    let options = ['A', 'B', 'C', 'D', 'E']; // Opsi standar
+    
+    for (let r = 0; r < rows; r++) {
+        let maxPixels = 0;
+        let bestOption = '';
+        let multiAnswers = [];
+        
+        for (let c = 0; c < cols; c++) {
+            let x = startX + (c * spacingX);
+            let y = startY + (r * spacingY);
+            
+            // Pastikan koordinat tidak keluar dari layar kamera
+            if (x >= 0 && y >= 0 && x + boxW <= threshMat.cols && y + boxH <= threshMat.rows) {
+                let rect = new cv.Rect(x, y, boxW, boxH);
+                let roi = threshMat.roi(rect);
+                
+                // Hitung jumlah piksel putih (tinta pensil/pulpen yang sudah di-threshold)
+                let pixelCount = cv.countNonZero(roi);
+                
+                // Angka 150 adalah sensitivitas (bisa dinaikkan jika terlalu sensitif)
+                if (pixelCount > 150) { 
+                    if (isMultiAnswer) {
+                        multiAnswers.push(options[c]);
+                    } else if (pixelCount > maxPixels) {
+                        maxPixels = pixelCount;
+                        bestOption = options[c];
+                    }
+                }
+                roi.delete();
+            }
+        }
+        result[r + 1] = isMultiAnswer ? multiAnswers : bestOption;
+    }
+    return result;
 }
 
-// Fungsi untuk membaca kertas siswa, OCR, dan menghitung nilai
+// Fungsi memproses Kunci Jawaban Master (Real Pixel Reading)
+function extractMasterKey() {
+    if (!cvReady || !grayMat) return false;
+    
+    // Ubah gambar jadi hitam putih murni (tinta hitam jadi putih agar mudah dihitung)
+    let threshMat = new cv.Mat();
+    cv.threshold(grayMat, threshMat, 100, 255, cv.THRESH_BINARY_INV);
+
+    /* 
+     * [KALIBRASI KOORDINAT PENTING]
+     * Nilai x, y, width, height di bawah ini adalah rasio dari layar kamera.
+     * Anda/Developer harus mengatur angka ini agar pas dengan posisi tabel PG di kertas.
+     * Contoh di bawah: Membaca tabel PG Sederhana (10 soal, 5 opsi).
+     */
+    let pgAnswers = readOMRGrid(
+        threshMat, 
+        Math.round(grayMat.cols * 0.1), // startX (Mulai dari 10% lebar layar kiri)
+        Math.round(grayMat.rows * 0.3), // startY (Mulai dari 30% tinggi layar atas)
+        10, // Jumlah baris (10 soal)
+        5,  // Jumlah opsi (A,B,C,D,E)
+        Math.round(grayMat.cols * 0.05), // Lebar 1 kotak opsi
+        Math.round(grayMat.rows * 0.03), // Tinggi 1 kotak opsi
+        Math.round(grayMat.cols * 0.08), // Jarak antar kotak ke samping (spacingX)
+        Math.round(grayMat.rows * 0.05)  // Jarak antar kotak ke bawah (spacingY)
+    );
+
+    threshMat.delete(); // Bersihkan memori
+
+    // Simpan ke State
+    AppState.masterKey = {
+        pg: pgAnswers,
+        // Untuk tabel Kompleks dan Kategori, panggil fungsi readOMRGrid lagi 
+        // dengan startX dan startY yang menunjuk ke tabel bagian bawah kertas.
+        mcma: {}, 
+        kategori: {} 
+    };
+
+    return true; 
+}
+
+// Fungsi memproses Kertas Siswa (Real Pixel Reading)
 function processStudentSheet(width, height) {
-    // 1. Ubah state ke 'paused' agar kamera berhenti memindai berulang-ulang
     AppState.mode = 'paused';
     
-    // 2. Ekstrak pola silang siswa dari frame saat ini (grayMat)
-    // (Logika OpenCV membaca letak coretan siswa yang identik dengan proses extractMasterKey)
+    let threshMat = new cv.Mat();
+    cv.threshold(grayMat, threshMat, 100, 255, cv.THRESH_BINARY_INV);
+
+    // Baca coretan siswa dengan koordinat yang SAMA PERSIS dengan kunci master
+    let studentPG = readOMRGrid(
+        threshMat, 
+        Math.round(width * 0.1), Math.round(height * 0.3), 
+        10, 5, 
+        Math.round(width * 0.05), Math.round(height * 0.03), 
+        Math.round(width * 0.08), Math.round(height * 0.05)
+    );
+
     let studentAnswers = {
-        pg: { 1: 'A', 2: 'B' }, // Misal nomor 2 salah karena master kuncinya C
-        mcma: { 11: ['A', 'C'] },
-        kategori: { 16: ['B', 'S', 'S'] }
+        pg: studentPG,
+        mcma: {}, 
+        kategori: {}
     };
+
+    threshMat.delete();
+
+    // Panggil OCR untuk membaca NIS
+    extractNISFromImage().then((nis) => {
+        if (typeof calculateFinalScore === 'function') {
+            calculateFinalScore(nis, studentAnswers, AppState.masterKey, AppState.weights);
+        }
+    }).catch(err => {
+        AppState.mode = 'student'; 
+    });
+}
+
+;
 
     // 3. Panggil fungsi OCR dari ocr.js untuk membaca nomor siswa di bagian atas kertas
     // Kita kirimkan potongan gambar (crop) khusus area isian Nomor
