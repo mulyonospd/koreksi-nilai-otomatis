@@ -3,19 +3,23 @@
 let srcMat = null;
 let grayMat = null;
 let edgesMat = null;
-let currentCorners = null; // Menyimpan 4 titik sudut kertas/tabel
+let currentCorners = null;
 
-// 1. Fungsi Pembantu: Mengurutkan 4 titik (Kiri Atas, Kanan Atas, Kanan Bawah, Kiri Bawah)
+const GRID_CONFIG = {
+    pg: { startX: 80, startY: 150, rows: 10, cols: 5, boxW: 35, boxH: 35, spacingX: 50, spacingY: 50, options: ['A','B','C','D','E'] },
+    mcma: { startX: 80, startY: 680, rows: 3, cols: 5, boxW: 35, boxH: 35, spacingX: 50, spacingY: 50, options: ['A','B','C','D','E'] },
+    kategori: { startX: 450, startY: 150, rows: 5, cols: 3, boxW: 35, boxH: 35, spacingX: 50, spacingY: 50, options: ['B','S','B'] }
+};
+
 function sortCorners(corners) {
     corners.sort((a, b) => a.y - b.y);
     let top = corners.slice(0, 2).sort((a, b) => a.x - b.x);
     let bottom = corners.slice(2, 4).sort((a, b) => a.x - b.x);
-    // Kembalikan urutan: TL (Top-Left), TR (Top-Right), BR (Bottom-Right), BL (Bottom-Left)
     return [top[0], top[1], bottom[1], bottom[0]];
 }
 
-// 2. Fungsi Pembantu: Mencari 4 sudut dari objek kotak terbesar (Tabel/Kertas)
-function findPaperCorners(contours) {
+// Mencari 4 sudut dari Bingkai Tabel Soal (Bukan Tepi Kertas)
+function findTableCorners(contours) {
     let maxArea = 0;
     let bestCorners = null;
 
@@ -23,13 +27,12 @@ function findPaperCorners(contours) {
         let cnt = contours.get(i);
         let area = cv.contourArea(cnt);
         
-        // Jika areanya cukup besar
-        if (area > 20000) {
+        // Memfilter kontur berukuran sedang-besar (Fokus ke Bingkai Tabel)
+        if (area > 10000) {
             let peri = cv.arcLength(cnt, true);
             let approx = new cv.Mat();
-            cv.approxPolyDP(cnt, approx, 0.02 * peri, true);
+            cv.approxPolyDP(cnt, approx, 0.03 * peri, true); // Toleransi sudut diperluas
             
-            // Jika bentuknya punya 4 sudut (segi empat)
             if (approx.rows === 4 && area > maxArea) {
                 maxArea = area;
                 let pts = [];
@@ -44,7 +47,6 @@ function findPaperCorners(contours) {
     return bestCorners;
 }
 
-// 3. Looping Kamera
 function scanFrame(videoElement, ctxOverlay, width, height) {
     if (!window.cvIsLoaded) return; 
 
@@ -59,23 +61,21 @@ function scanFrame(videoElement, ctxOverlay, width, height) {
     srcMat.data.set(imageData.data);
 
     cv.cvtColor(srcMat, grayMat, cv.COLOR_RGBA2GRAY, 0);
-    // Sedikit blur agar garis lebih solid
-    let blurred = new cv.Mat();
-    cv.GaussianBlur(grayMat, blurred, new cv.Size(5, 5), 0, 0, cv.BORDER_DEFAULT);
-    cv.Canny(blurred, edgesMat, 75, 200, 3, false);
-    blurred.delete();
+    
+    // Thresholding untuk mempertegas garis hitam tabel
+    let thresh = new cv.Mat();
+    cv.adaptiveThreshold(grayMat, thresh, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY_INV, 15, 10);
 
     let contours = new cv.MatVector();
     let hierarchy = new cv.Mat();
-    cv.findContours(edgesMat, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+    cv.findContours(thresh, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
 
-    // Cari 4 sudut kertas
-    currentCorners = findPaperCorners(contours);
+    currentCorners = findTableCorners(contours);
     
     ctxOverlay.clearRect(0, 0, width, height);
     
-    // Jika 4 sudut terdeteksi, gambar kotak mengikuti miringnya kertas
     if (currentCorners) {
+        // Gambarkan garis hijau mengunci bingkai tabel
         ctxOverlay.strokeStyle = "#00FF00";
         ctxOverlay.lineWidth = 3;
         ctxOverlay.beginPath();
@@ -86,47 +86,70 @@ function scanFrame(videoElement, ctxOverlay, width, height) {
         ctxOverlay.closePath();
         ctxOverlay.stroke();
 
-        // Jika mode scan siswa aktif, langsung jepret!
+        drawOverlays(ctxOverlay, currentCorners);
+
         if (AppState.mode === 'student') {
             processStudentSheet(width, height);
         }
     } else {
-        // Panduan jika kertas belum pas
-        ctxOverlay.strokeStyle = "rgba(255, 0, 0, 0.5)";
+        // Tampilkan kotak panduan berwarna oranye jika tabel belum pas
+        ctxOverlay.strokeStyle = "rgba(255, 165, 0, 0.6)";
         ctxOverlay.lineWidth = 2;
-        ctxOverlay.strokeRect(width * 0.1, height * 0.2, width * 0.8, height * 0.6);
+        ctxOverlay.strokeRect(width * 0.1, height * 0.15, width * 0.8, height * 0.7);
     }
 
+    thresh.delete();
     contours.delete();
     hierarchy.delete();
 }
 
-// 4. Fungsi Pembaca Piksel Grid (Diperbarui dengan opsi Tipe Soal)
-function readOMRGrid(threshMat, startX, startY, rows, cols, boxW, boxH, spacingX, spacingY, tipe = 'pg') {
+function warpPointToScreen(x, y, corners) {
+    let u = x / 800;
+    let v = y / 1000;
+    let tl = corners[0], tr = corners[1], br = corners[2], bl = corners[3];
+    let px = (1 - u) * (1 - v) * tl.x + u * (1 - v) * tr.x + u * v * br.x + (1 - u) * v * bl.x;
+    let py = (1 - u) * (1 - v) * tl.y + u * (1 - v) * tr.y + u * v * br.y + (1 - u) * v * bl.y;
+    return { x: px, y: py };
+}
+
+function drawOverlays(ctx, corners) {
+    if (!AppState.overlayData || AppState.overlayData.length === 0) return;
+
+    AppState.overlayData.forEach(item => {
+        let pt = warpPointToScreen(item.x, item.y, corners);
+        ctx.fillStyle = item.color;
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, 7, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.strokeStyle = "#FFFFFF";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+    });
+}
+
+function readOMRGrid(threshMat, cfg, tipe = 'pg') {
     let result = {};
-    let options = (tipe === 'kategori') ? ['B', 'S', 'B'] : ['A', 'B', 'C', 'D', 'E']; 
-    
-    for (let r = 0; r < rows; r++) {
+    for (let r = 0; r < cfg.rows; r++) {
         let maxPixels = 0;
         let bestOption = '';
         let multiAnswers = [];
         
-        for (let c = 0; c < cols; c++) {
-            let x = startX + (c * spacingX);
-            let y = startY + (r * spacingY);
+        for (let c = 0; c < cfg.cols; c++) {
+            let x = cfg.startX + (c * cfg.spacingX);
+            let y = cfg.startY + (r * cfg.spacingY);
             
-            if (x >= 0 && y >= 0 && x + boxW <= threshMat.cols && y + boxH <= threshMat.rows) {
-                let rect = new cv.Rect(x, y, boxW, boxH);
+            if (x >= 0 && y >= 0 && x + cfg.boxW <= threshMat.cols && y + cfg.boxH <= threshMat.rows) {
+                let rect = new cv.Rect(x, y, cfg.boxW, cfg.boxH);
                 let roi = threshMat.roi(rect);
-                let pixelCount = cv.countNonZero(roi); // Hitung tinta
+                let pixelCount = cv.countNonZero(roi);
                 
-                if (pixelCount > 100) { // Sensitivitas (Bisa diubah jika kurang peka)
+                if (pixelCount > 120) { 
                     if (tipe === 'mcma' || tipe === 'kategori') {
-                        multiAnswers.push(options[c]);
-                    } else { // Untuk PG biasa, cari piksel terbanyak
+                        multiAnswers.push(cfg.options[c]);
+                    } else {
                         if (pixelCount > maxPixels) {
                             maxPixels = pixelCount;
-                            bestOption = options[c];
+                            bestOption = cfg.options[c];
                         }
                     }
                 }
@@ -138,94 +161,102 @@ function readOMRGrid(threshMat, startX, startY, rows, cols, boxW, boxH, spacingX
     return result;
 }
 
-// 5. Fungsi Warp Perspective (Meluruskan Kertas)
 function flattenPaper(sourceMat, corners) {
-    // Kita paksa gambar yang miring ditarik jadi kanvas datar ukuran 800 x 1000 piksel
     let warpedMat = new cv.Mat();
     let dsize = new cv.Size(800, 1000);
     
     let srcTri = cv.matFromArray(4, 1, cv.CV_32FC2, [
-        corners[0].x, corners[0].y, // TL
-        corners[1].x, corners[1].y, // TR
-        corners[2].x, corners[2].y, // BR
-        corners[3].x, corners[3].y  // BL
+        corners[0].x, corners[0].y,
+        corners[1].x, corners[1].y,
+        corners[2].x, corners[2].y,
+        corners[3].x, corners[3].y
     ]);
     
     let dstTri = cv.matFromArray(4, 1, cv.CV_32FC2, [
-        0, 0,          // TL
-        800, 0,        // TR
-        800, 1000,     // BR
-        0, 1000        // BL
+        0, 0, 800, 0, 800, 1000, 0, 1000
     ]);
 
     let M = cv.getPerspectiveTransform(srcTri, dstTri);
     cv.warpPerspective(sourceMat, warpedMat, M, dsize);
     
     srcTri.delete(); dstTri.delete(); M.delete();
-    return warpedMat; // Gambar kembalian ukurannya PASTI 800x1000
+    return warpedMat;
 }
-
-// --- FUNGSI EKSEKUSI PEMBACAAN ---
 
 function extractAnswersFromFlatImage(warpedMat) {
     let threshMat = new cv.Mat();
-    // Menggunakan Adaptive Threshold untuk menghilangkan efek bayangan lampu
     cv.adaptiveThreshold(warpedMat, threshMat, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 15, 5);
 
-    /* 
-     * =========================================================
-     * AREA KALIBRASI (KARENA GAMBAR KINI SELALU 800x1000 PIKSEL)
-     * =========================================================
-     * Nilai di bawah adalah PIKSEL TETAP, bukan persentase lagi.
-     * Silakan ubah angka startX dan startY ini sesuai bentuk tabel di kertas Anda.
-     */
-     
-    // 1. Baca PG Sederhana (Misal tabel ada di atas: X:100, Y:200)
-    let pgAnswers = readOMRGrid(threshMat, 100, 200, 10, 5, 30, 30, 45, 45, 'pg');
-
-    // 2. Baca PG Kompleks (Misal tabel ada di tengah: X:100, Y:600)
-    // Tipe diset 'mcma' agar bisa menampung 2 atau 3 jawaban.
-    let mcmaAnswers = readOMRGrid(threshMat, 100, 600, 5, 5, 30, 30, 45, 45, 'mcma');
-
-    // 3. Baca Kategori B/S (Misal tabel ada di sebelah kanan: X:500, Y:200)
-    // Tipe diset 'kategori' agar opsi jadi ['B', 'S'] dan bisa menampung multi.
-    let kategoriAnswers = readOMRGrid(threshMat, 500, 200, 5, 3, 30, 30, 45, 45, 'kategori');
+    let pgAnswers = readOMRGrid(threshMat, GRID_CONFIG.pg, 'pg');
+    let mcmaAnswers = readOMRGrid(threshMat, GRID_CONFIG.mcma, 'mcma');
+    let kategoriAnswers = readOMRGrid(threshMat, GRID_CONFIG.kategori, 'kategori');
 
     threshMat.delete();
 
-    return {
-        pg: pgAnswers,
-        mcma: mcmaAnswers, 
-        kategori: kategoriAnswers 
+    return { pg: pgAnswers, mcma: mcmaAnswers, kategori: kategoriAnswers };
+}
+
+function generateVisualOverlays(studentAnswers, masterKey) {
+    let overlays = [];
+
+    const addDot = (cfg, r, optChar, color) => {
+        let c = cfg.options.indexOf(optChar);
+        if (c !== -1) {
+            let cx = cfg.startX + (c * cfg.spacingX) + (cfg.boxW / 2);
+            let cy = cfg.startY + (r * cfg.spacingY) + (cfg.boxH / 2);
+            overlays.push({ x: cx, y: cy, color: color });
+        }
     };
+
+    for (let r = 0; r < GRID_CONFIG.pg.rows; r++) {
+        let no = r + 1;
+        let masterAns = masterKey.pg[no];
+        let studentAns = studentAnswers.pg[no];
+
+        if (masterAns) addDot(GRID_CONFIG.pg, r, masterAns, '#FFFF00');
+        if (studentAns) {
+            let color = (studentAns === masterAns) ? '#00FF00' : '#FF0000';
+            addDot(GRID_CONFIG.pg, r, studentAns, color);
+        }
+    }
+
+    return overlays;
 }
 
 function extractMasterKey() {
     if (!window.cvIsLoaded || !grayMat || !currentCorners) {
-        alert("Posisikan tabel hingga muncul garis hijau mengikuti kertas!");
+        alert("Posisikan tabel hingga muncul kotak hijau!");
         return false;
     }
     
-    // 1. Tarik gambar jadi datar 800x1000
     let flatMat = flattenPaper(grayMat, currentCorners);
-    
-    // 2. Ekstrak jawaban dari gambar datar tersebut
     AppState.masterKey = extractAnswersFromFlatImage(flatMat);
     flatMat.delete();
 
-    console.log("Kunci Master:", AppState.masterKey); // Cek F12 jika ingin melihat hasil baca
+    AppState.overlayData = [];
+    for (let r = 0; r < GRID_CONFIG.pg.rows; r++) {
+        let ans = AppState.masterKey.pg[r + 1];
+        if (ans) {
+            let c = GRID_CONFIG.pg.options.indexOf(ans);
+            if (c !== -1) {
+                let cx = GRID_CONFIG.pg.startX + (c * GRID_CONFIG.pg.spacingX) + (GRID_CONFIG.pg.boxW / 2);
+                let cy = GRID_CONFIG.pg.startY + (r * GRID_CONFIG.pg.spacingY) + (GRID_CONFIG.pg.boxH / 2);
+                AppState.overlayData.push({ x: cx, y: cy, color: '#FFFF00' });
+            }
+        }
+    }
+
     return true; 
 }
 
 function processStudentSheet(width, height) {
     AppState.mode = 'paused';
     
-    // 1. Tarik gambar siswa jadi datar 800x1000
     let flatMat = flattenPaper(grayMat, currentCorners);
-    
-    // 2. Ekstrak jawaban siswa dengan koordinat presisi yang sama dengan master
     let studentAnswers = extractAnswersFromFlatImage(flatMat);
     flatMat.delete();
+
+    AppState.overlayData = generateVisualOverlays(studentAnswers, AppState.masterKey);
 
     if (typeof extractNISFromImage === 'function') {
         extractNISFromImage().then((nis) => {
