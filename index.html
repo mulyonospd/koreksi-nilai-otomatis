@@ -8,8 +8,16 @@
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js" defer></script>
     
-    <!-- PERBAIKAN: Menggunakan CDN jsDelivr versi terkompresi agar unduhan lebih ngebut -->
-    <script async src="https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.7.0-release.1/opencv.js" type="text/javascript"></script>
+    <!-- PENGAMAN BARU: Mencegah Crash saat AI diunduh -->
+    <script>
+        window.cvIsLoaded = false;
+        var Module = {
+            onRuntimeInitialized: function() {
+                window.cvIsLoaded = true; // Tandai AI sudah 100% siap
+            }
+        };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.7.0-release.1/opencv.js" defer></script>
 </head>
 <body>
 
@@ -67,25 +75,32 @@
         </div>
     </div>
 
+    <!-- SCRIPT PROGRESS BAR (Lebih Aman) -->
     <script>
-        // Skrip tambahan real-time untuk menampilkan persentase unduhan AI
         window.addEventListener('DOMContentLoaded', () => {
             const loadIndicator = document.getElementById('loading-indicator');
+            const btnLockMaster = document.getElementById('btn-lock-master');
             let progress = 10;
-            const interval = setInterval(() => {
-                if (progress < 90) {
+            
+            // Animasi angka persen
+            const animasiInterval = setInterval(() => {
+                if (progress < 95) {
                     progress += 15;
                     if(loadIndicator) loadIndicator.innerText = `Menyiapkan Sistem AI... (${progress}%)`;
                 }
             }, 300);
 
-            // Jika OpenCV sudah siap, hentikan interval
-            window.notifyCvReady = () => {
-                clearInterval(interval);
-                if(loadIndicator) loadIndicator.style.display = 'none';
-                const btn = document.getElementById('btn-lock-master');
-                if(btn) btn.style.display = 'block';
-            };
+            // Cek terus menerus apakah AI (OpenCV) sudah selesai merakit diri
+            const cekKesiapanInterval = setInterval(() => {
+                if (window.cvIsLoaded === true) {
+                    clearInterval(animasiInterval);
+                    clearInterval(cekKesiapanInterval);
+                    
+                    // Hilangkan tulisan kuning, munculkan tombol biru
+                    if(loadIndicator) loadIndicator.style.display = 'none';
+                    if(btnLockMaster) btnLockMaster.style.display = 'block';
+                }
+            }, 200);
         });
     </script>
 
