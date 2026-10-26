@@ -1,20 +1,25 @@
 // vision.js
 
-// Memastikan library OpenCV sudah termuat sebelum eksekusi
 let cvReady = false;
 cv['onRuntimeInitialized'] = () => {
     cvReady = true;
     console.log("OpenCV.js siap digunakan.");
+    
+    // Logika UI baru: Menghilangkan loading dan memunculkan tombol
+    const loadingIndicator = document.getElementById('loading-indicator');
+    const btnLockMaster = document.getElementById('btn-lock-master');
+    if (loadingIndicator && btnLockMaster) {
+        loadingIndicator.style.display = 'none';
+        btnLockMaster.style.display = 'block';
+    }
 };
 
-// Variabel matriks gambar (Mat) untuk memori sementara
 let srcMat = null;
 let grayMat = null;
 let edgesMat = null;
 
-// Fungsi utama yang dipanggil berulang kali (looping) oleh camera.js
 function scanFrame(videoElement, ctxOverlay, width, height) {
-    if (!cvReady) return; // Tunggu sampai OpenCV selesai dimuat
+    if (!cvReady) return; 
 
     if (!srcMat) {
         srcMat = new cv.Mat(height, width, cv.CV_8UC4);
@@ -51,7 +56,6 @@ function scanFrame(videoElement, ctxOverlay, width, height) {
     hierarchy.delete();
 }
 
-// Fungsi mendeteksi apakah tabel soal sudah masuk di kamera
 function detectPaperAlignment(contours, ctx, width, height) {
     let maxArea = 0;
     for (let i = 0; i < contours.size(); ++i) {
@@ -59,11 +63,9 @@ function detectPaperAlignment(contours, ctx, width, height) {
         let area = cv.contourArea(cnt);
         if (area > maxArea) maxArea = area;
     }
-    // Ambang batas area dikecilkan agar kotak hijau lebih mudah menyala saat di tes
     return maxArea > 10000; 
 }
 
-// Fungsi bantuan untuk membaca grid jawaban (Menghitung jumlah tinta/tanda silang)
 function readOMRGrid(threshMat, startX, startY, rows, cols, boxW, boxH, spacingX, spacingY, isMultiAnswer = false) {
     let result = {};
     let options = ['A', 'B', 'C', 'D', 'E']; 
@@ -99,9 +101,7 @@ function readOMRGrid(threshMat, startX, startY, rows, cols, boxW, boxH, spacingX
     return result;
 }
 
-// Fungsi memproses Kunci Jawaban Master (Real Pixel Reading)
 function extractMasterKey() {
-    // Jika AI belum selesai loading dari internet, paksa gagal agar tombol merespon peringatan
     if (!cvReady || !grayMat) {
         return false;
     }
@@ -128,7 +128,6 @@ function extractMasterKey() {
     return true; 
 }
 
-// Fungsi memproses Kertas Siswa (Real Pixel Reading)
 function processStudentSheet(width, height) {
     AppState.mode = 'paused';
     
@@ -151,7 +150,6 @@ function processStudentSheet(width, height) {
 
     threshMat.delete();
 
-    // Panggil OCR
     if (typeof extractNISFromImage === 'function') {
         extractNISFromImage().then((nis) => {
             if (typeof calculateFinalScore === 'function') {
