@@ -6,18 +6,12 @@
     <title>Koreksi Lembar Jawab</title>
     
     <link rel="stylesheet" href="style.css">
+    
+    <!-- Tesseract OCR -->
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js" defer></script>
     
-    <!-- PENGAMAN BARU: Mencegah Crash saat AI diunduh -->
-    <script>
-        window.cvIsLoaded = false;
-        var Module = {
-            onRuntimeInitialized: function() {
-                window.cvIsLoaded = true; // Tandai AI sudah 100% siap
-            }
-        };
-    </script>
-    <script src="https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.7.0-release.1/opencv.js" defer></script>
+    <!-- PENGAMAN PRO: Menggunakan CDNJS Cloudflare (Paling stabil & anti-corrupt) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/opencv.js/4.8.0/opencv.min.js" defer></script>
 </head>
 <body>
 
@@ -75,14 +69,16 @@
         </div>
     </div>
 
-    <!-- SCRIPT PROGRESS BAR (Lebih Aman) -->
+    <!-- SCRIPT PROGRESS BAR (METODE PENGECEKAN AKTIF) -->
     <script>
+        window.cvIsLoaded = false;
+        
         window.addEventListener('DOMContentLoaded', () => {
             const loadIndicator = document.getElementById('loading-indicator');
             const btnLockMaster = document.getElementById('btn-lock-master');
             let progress = 10;
             
-            // Animasi angka persen
+            // Animasi angka persen palsu untuk menenangkan pengguna
             const animasiInterval = setInterval(() => {
                 if (progress < 95) {
                     progress += 15;
@@ -90,17 +86,20 @@
                 }
             }, 300);
 
-            // Cek terus menerus apakah AI (OpenCV) sudah selesai merakit diri
+            // METODE POLING: Pengecekan paksa langsung ke otak AI
             const cekKesiapanInterval = setInterval(() => {
-                if (window.cvIsLoaded === true) {
+                // Mengecek apakah library cv dan modul cv.Mat (struktur inti AI) sudah tercipta
+                if (typeof cv !== 'undefined' && typeof cv.Mat !== 'undefined') {
+                    window.cvIsLoaded = true; // Tandai siap untuk vision.js
+                    
                     clearInterval(animasiInterval);
                     clearInterval(cekKesiapanInterval);
                     
-                    // Hilangkan tulisan kuning, munculkan tombol biru
+                    // Eksekusi UI seketika
                     if(loadIndicator) loadIndicator.style.display = 'none';
                     if(btnLockMaster) btnLockMaster.style.display = 'block';
                 }
-            }, 200);
+            }, 500); // Sistem mengecek setiap 0.5 detik
         });
     </script>
 
