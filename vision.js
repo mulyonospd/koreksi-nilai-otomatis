@@ -82,7 +82,7 @@ function detectPaperAlignment(contours, ctx, width, height) {
 
 // Fungsi dipanggil saat tombol "Kunci Peta Jawaban" ditekan di app.js
 function extractMasterKey() {
-    if (!cvReady || !grayMat) return false;
+    // if (!cvReady || !grayMat) return false;
 
     console.log("Memproses Kunci Jawaban Master...");
     
