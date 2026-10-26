@@ -72,21 +72,31 @@ btnEndSession.addEventListener('click', () => {
 btnNextScan.addEventListener('click', () => {
     bottomBanner.classList.add('hidden');
     AppState.overlayData = [];
-    AppState.mode = 'student';
     
-    // Lanjutkan video feed kamera
+    // Set mode ke 'cooldown' agar tidak langsung jepret di milidetik yang sama
+    AppState.mode = 'cooldown';
+    
     const videoElement = document.getElementById('video-feed');
     if (videoElement) videoElement.play();
+
+    // Beri jeda 1,5 detik untuk menggeser kertas sebelum pemindai otomatis aktif lagi
+    setTimeout(() => {
+        AppState.mode = 'student';
+    }, 1500);
 });
 
 btnRescan.addEventListener('click', () => {
     bottomBanner.classList.add('hidden');
     AppState.overlayData = [];
-    AppState.mode = 'student';
     
-    // Lanjutkan video feed kamera
+    AppState.mode = 'cooldown';
+    
     const videoElement = document.getElementById('video-feed');
     if (videoElement) videoElement.play();
+
+    setTimeout(() => {
+        AppState.mode = 'student';
+    }, 1500);
 });
 
 function showResultPopup(nis, totalScore, scorePG, scoreKompleks, scoreKategori) {
