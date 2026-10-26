@@ -5,26 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Koreksi Lembar Jawab</title>
     
-    <!-- Tautan ke file CSS statis -->
     <link rel="stylesheet" href="style.css">
-    
-    <!-- Tesseract.js (Library OCR ringan via CDN) -->
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js" defer></script>
-    
-    <!-- OpenCV.js (Library Computer Vision via CDN) -->
     <script async src="https://docs.opencv.org/4.8.0/opencv.js" type="text/javascript"></script>
 </head>
 <body>
 
-    <!-- HALAMAN 1: Pengaturan Bobot Nilai -->
     <div id="screen-settings" class="screen active">
         <h2>Pengaturan Bobot Nilai</h2>
-        
         <div class="form-group">
             <label>PG Sederhana (Poin per 1 benar):</label>
             <input type="number" id="weight-pg" value="1" step="0.5">
         </div>
-
         <div class="form-group">
             <label>PG Kompleks (MCMA):</label>
             <div class="input-row">
@@ -33,16 +25,13 @@
                 <input type="number" id="weight-mcma-3" placeholder="Jika 3 benar" value="3" step="0.5">
             </div>
         </div>
-
         <div class="form-group">
             <label>PG Kategori (Poin per 1 B/S benar):</label>
             <input type="number" id="weight-kategori" value="1" step="0.5">
         </div>
-
         <button id="btn-start-master" class="btn-primary">Simpan & Lanjut ke Kunci Jawaban</button>
     </div>
 
-    <!-- HALAMAN 2: Area Kamera (Untuk Kunci & Siswa) -->
     <div id="screen-camera" class="screen hidden">
         <div class="top-bar">
             <span id="instruction-text">Arahkan ke lembar KUNCI JAWABAN</span>
@@ -50,28 +39,25 @@
         </div>
 
         <div class="camera-container">
-            <!-- Elemen penangkap video dari kamera belakang -->
             <video id="video-feed" autoplay playsinline></video>
-            
-            <!-- Canvas transparan untuk menggambar kotak deteksi (UI Overlay) -->
             <canvas id="canvas-overlay"></canvas>
-            
-            <!-- Panduan kotak imajiner untuk memposisikan kertas -->
             <div class="guideline"></div>
         </div>
 
-        <!-- Tombol khusus tahap Kunci Jawaban -->
         <div id="control-master" class="controls">
-            <button id="btn-lock-master" class="btn-primary">Kunci Peta Jawaban</button>
+            <!-- Indikator Loading Baru -->
+            <div id="loading-indicator" style="background: #ffc107; color: #333; padding: 12px; border-radius: 8px; font-weight: bold; text-align: center; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+                Sedang memuat sistem AI... Mohon tunggu.
+            </div>
+            <!-- Tombol disembunyikan secara default menggunakan inline style -->
+            <button id="btn-lock-master" class="btn-primary" style="display: none;">Kunci Peta Jawaban</button>
         </div>
 
-        <!-- Pop-up Hasil Nilai Siswa (Muncul saat freeze frame) -->
         <div id="popup-result" class="modal hidden">
             <div class="modal-content">
                 <h2 id="result-nis">Nomor Siswa: Menganalisis...</h2>
                 <h1 id="result-total">Skor Akhir: 0</h1>
                 <p class="details" id="result-details">PG: 0 | Kompleks: 0 | Kategori: 0</p>
-                
                 <div class="modal-actions">
                     <button id="btn-next-scan" class="btn-success">Lanjut Scan</button>
                     <button id="btn-rescan" class="btn-warning">Pindai Ulang</button>
@@ -80,7 +66,6 @@
         </div>
     </div>
 
-    <!-- Memuat file-file script modular Anda secara berurutan -->
     <script src="camera.js" defer></script>
     <script src="vision.js" defer></script>
     <script src="ocr.js" defer></script>
