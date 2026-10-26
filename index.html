@@ -7,7 +7,9 @@
     
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js" defer></script>
-    <script async src="https://docs.opencv.org/4.8.0/opencv.js" type="text/javascript"></script>
+    
+    <!-- PERBAIKAN: Menggunakan CDN jsDelivr versi terkompresi agar unduhan lebih ngebut -->
+    <script async src="https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.7.0-release.1/opencv.js" type="text/javascript"></script>
 </head>
 <body>
 
@@ -45,11 +47,10 @@
         </div>
 
         <div id="control-master" class="controls">
-            <!-- Indikator Loading Baru -->
+            <!-- Indikator Loading Dinamis -->
             <div id="loading-indicator" style="background: #ffc107; color: #333; padding: 12px; border-radius: 8px; font-weight: bold; text-align: center; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
-                Sedang memuat sistem AI... Mohon tunggu.
+                Menyiapkan Sistem AI... (0%)
             </div>
-            <!-- Tombol disembunyikan secara default menggunakan inline style -->
             <button id="btn-lock-master" class="btn-primary" style="display: none;">Kunci Peta Jawaban</button>
         </div>
 
@@ -65,6 +66,28 @@
             </div>
         </div>
     </div>
+
+    <script>
+        // Skrip tambahan real-time untuk menampilkan persentase unduhan AI
+        window.addEventListener('DOMContentLoaded', () => {
+            const loadIndicator = document.getElementById('loading-indicator');
+            let progress = 10;
+            const interval = setInterval(() => {
+                if (progress < 90) {
+                    progress += 15;
+                    if(loadIndicator) loadIndicator.innerText = `Menyiapkan Sistem AI... (${progress}%)`;
+                }
+            }, 300);
+
+            // Jika OpenCV sudah siap, hentikan interval
+            window.notifyCvReady = () => {
+                clearInterval(interval);
+                if(loadIndicator) loadIndicator.style.display = 'none';
+                const btn = document.getElementById('btn-lock-master');
+                if(btn) btn.style.display = 'block';
+            };
+        });
+    </script>
 
     <script src="camera.js" defer></script>
     <script src="vision.js" defer></script>
