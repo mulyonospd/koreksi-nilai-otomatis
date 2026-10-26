@@ -1,3 +1,4 @@
+<!-- index.html -->
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -6,27 +7,20 @@
     <title>Koreksi Lembar Jawab</title>
     
     <link rel="stylesheet" href="style.css">
-    
-    <!-- Tesseract OCR -->
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js" defer></script>
     
-    <!-- Fungsi Callback Langsung saat OpenCV selesai diunduh -->
     <script>
         window.cvIsLoaded = false;
         function openCvReady() {
-            // Beri jeda 1 detik agar HP selesai mengekstrak file di RAM
             setTimeout(() => {
                 window.cvIsLoaded = true;
                 const loadIndicator = document.getElementById('loading-indicator');
                 const btnLockMaster = document.getElementById('btn-lock-master');
-                
                 if(loadIndicator) loadIndicator.style.display = 'none';
                 if(btnLockMaster) btnLockMaster.style.display = 'block';
             }, 1000);
         }
     </script>
-    
-    <!-- Memanggil OpenCV dari server resminya, dengan pemicu onload -->
     <script src="https://docs.opencv.org/4.8.0/opencv.js" onload="openCvReady()" defer></script>
 </head>
 <body>
@@ -65,22 +59,24 @@
         </div>
 
         <div id="control-master" class="controls">
-            <!-- Indikator Loading -->
-            <div id="loading-indicator" style="background: #ffc107; color: #333; padding: 12px; border-radius: 8px; font-weight: bold; text-align: center; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+            <div id="loading-indicator" style="background: #ffc107; color: #333; padding: 12px; border-radius: 8px; font-weight: bold; text-align: center; margin-bottom: 10px;">
                 Menyiapkan Sistem AI... (0%)
             </div>
             <button id="btn-lock-master" class="btn-primary" style="display: none;">Kunci Peta Jawaban</button>
         </div>
 
-        <div id="popup-result" class="modal hidden">
-            <div class="modal-content">
-                <h2 id="result-nis">Nomor Siswa: Menganalisis...</h2>
-                <h1 id="result-total">Skor Akhir: 0</h1>
-                <p class="details" id="result-details">PG: 0 | Kompleks: 0 | Kategori: 0</p>
-                <div class="modal-actions">
-                    <button id="btn-next-scan" class="btn-success">Lanjut Scan</button>
-                    <button id="btn-rescan" class="btn-warning">Pindai Ulang</button>
+        <!-- SPANDUK HASIL BARU DI BAGIAN BAWAH LAYAR (PENGGANTI MODAL POPUP) -->
+        <div id="bottom-result-banner" class="bottom-banner hidden">
+            <div class="banner-info">
+                <div class="banner-header">
+                    <span id="result-nis">NIS: -</span>
+                    <span id="result-total" class="score-badge">Skor: 0</span>
                 </div>
+                <p id="result-details" class="banner-details">PG: 0 | Kompleks: 0 | Kategori: 0</p>
+            </div>
+            <div class="banner-actions">
+                <button id="btn-rescan" class="btn-warning-sm">Scan Ulang</button>
+                <button id="btn-next-scan" class="btn-success-sm">Lanjut Scan</button>
             </div>
         </div>
     </div>
@@ -90,8 +86,6 @@
             const loadIndicator = document.getElementById('loading-indicator');
             const btnLockMaster = document.getElementById('btn-lock-master');
             let progress = 10;
-            
-            // Animasi angka persen
             const animasiInterval = setInterval(() => {
                 if (progress < 95) {
                     progress += 15;
@@ -99,17 +93,12 @@
                 }
             }, 300);
 
-            // SISTEM FAIL-SAFE (ANTI MACET): 
-            // Apapun yang terjadi pada peramban HP, paksa tombol muncul dalam 8 detik!
             setTimeout(() => {
-                clearInterval(animasiInterval); // Hentikan animasi
-                
-                // Jika setelah 8 detik tombol masih tersembunyi, paksa tampilkan
+                clearInterval(animasiInterval);
                 if (btnLockMaster && btnLockMaster.style.display === 'none') {
-                    window.cvIsLoaded = true; // Paksa status AI menjadi siap
+                    window.cvIsLoaded = true;
                     if(loadIndicator) loadIndicator.style.display = 'none';
                     btnLockMaster.style.display = 'block';
-                    console.log("Failsafe diaktifkan: Tombol dimunculkan paksa.");
                 }
             }, 8000); 
         });
