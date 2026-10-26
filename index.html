@@ -10,8 +10,24 @@
     <!-- Tesseract OCR -->
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js" defer></script>
     
-    <!-- PENGAMAN PRO: Menggunakan CDNJS Cloudflare (Paling stabil & anti-corrupt) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/opencv.js/4.8.0/opencv.min.js" defer></script>
+    <!-- Fungsi Callback Langsung saat OpenCV selesai diunduh -->
+    <script>
+        window.cvIsLoaded = false;
+        function openCvReady() {
+            // Beri jeda 1 detik agar HP selesai mengekstrak file di RAM
+            setTimeout(() => {
+                window.cvIsLoaded = true;
+                const loadIndicator = document.getElementById('loading-indicator');
+                const btnLockMaster = document.getElementById('btn-lock-master');
+                
+                if(loadIndicator) loadIndicator.style.display = 'none';
+                if(btnLockMaster) btnLockMaster.style.display = 'block';
+            }, 1000);
+        }
+    </script>
+    
+    <!-- Memanggil OpenCV dari server resminya, dengan pemicu onload -->
+    <script src="https://docs.opencv.org/4.8.0/opencv.js" onload="openCvReady()" defer></script>
 </head>
 <body>
 
@@ -49,7 +65,7 @@
         </div>
 
         <div id="control-master" class="controls">
-            <!-- Indikator Loading Dinamis -->
+            <!-- Indikator Loading -->
             <div id="loading-indicator" style="background: #ffc107; color: #333; padding: 12px; border-radius: 8px; font-weight: bold; text-align: center; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
                 Menyiapkan Sistem AI... (0%)
             </div>
@@ -69,16 +85,13 @@
         </div>
     </div>
 
-    <!-- SCRIPT PROGRESS BAR (METODE PENGECEKAN AKTIF) -->
     <script>
-        window.cvIsLoaded = false;
-        
         window.addEventListener('DOMContentLoaded', () => {
             const loadIndicator = document.getElementById('loading-indicator');
             const btnLockMaster = document.getElementById('btn-lock-master');
             let progress = 10;
             
-            // Animasi angka persen palsu untuk menenangkan pengguna
+            // Animasi angka persen
             const animasiInterval = setInterval(() => {
                 if (progress < 95) {
                     progress += 15;
@@ -86,20 +99,19 @@
                 }
             }, 300);
 
-            // METODE POLING: Pengecekan paksa langsung ke otak AI
-            const cekKesiapanInterval = setInterval(() => {
-                // Mengecek apakah library cv dan modul cv.Mat (struktur inti AI) sudah tercipta
-                if (typeof cv !== 'undefined' && typeof cv.Mat !== 'undefined') {
-                    window.cvIsLoaded = true; // Tandai siap untuk vision.js
-                    
-                    clearInterval(animasiInterval);
-                    clearInterval(cekKesiapanInterval);
-                    
-                    // Eksekusi UI seketika
+            // SISTEM FAIL-SAFE (ANTI MACET): 
+            // Apapun yang terjadi pada peramban HP, paksa tombol muncul dalam 8 detik!
+            setTimeout(() => {
+                clearInterval(animasiInterval); // Hentikan animasi
+                
+                // Jika setelah 8 detik tombol masih tersembunyi, paksa tampilkan
+                if (btnLockMaster && btnLockMaster.style.display === 'none') {
+                    window.cvIsLoaded = true; // Paksa status AI menjadi siap
                     if(loadIndicator) loadIndicator.style.display = 'none';
-                    if(btnLockMaster) btnLockMaster.style.display = 'block';
+                    btnLockMaster.style.display = 'block';
+                    console.log("Failsafe diaktifkan: Tombol dimunculkan paksa.");
                 }
-            }, 500); // Sistem mengecek setiap 0.5 detik
+            }, 8000); 
         });
     </script>
 
