@@ -94,7 +94,8 @@ function extractMasterKey() {
     }
     
     let threshMat = new cv.Mat();
-    cv.threshold(grayMat, threshMat, 100, 255, cv.THRESH_BINARY_INV);
+    // Menggunakan Adaptive Threshold untuk menghilangkan bayangan lampu/tangan
+    cv.adaptiveThreshold(grayMat, threshMat, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 15, 5);
 
     let pgAnswers = readOMRGrid(
         threshMat, 
@@ -119,8 +120,9 @@ function processStudentSheet(width, height) {
     AppState.mode = 'paused';
     
     let threshMat = new cv.Mat();
-    cv.threshold(grayMat, threshMat, 100, 255, cv.THRESH_BINARY_INV);
-
+    // Menggunakan Adaptive Threshold untuk menghilangkan bayangan lampu/tangan
+    cv.adaptiveThreshold(grayMat, threshMat, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 15, 5);
+    
     let studentPG = readOMRGrid(
         threshMat, 
         Math.round(width * 0.1), Math.round(height * 0.3), 
