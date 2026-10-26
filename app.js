@@ -73,12 +73,20 @@ btnNextScan.addEventListener('click', () => {
     bottomBanner.classList.add('hidden');
     AppState.overlayData = [];
     AppState.mode = 'student';
+    
+    // Lanjutkan video feed kamera
+    const videoElement = document.getElementById('video-feed');
+    if (videoElement) videoElement.play();
 });
 
 btnRescan.addEventListener('click', () => {
     bottomBanner.classList.add('hidden');
     AppState.overlayData = [];
     AppState.mode = 'student';
+    
+    // Lanjutkan video feed kamera
+    const videoElement = document.getElementById('video-feed');
+    if (videoElement) videoElement.play();
 });
 
 function showResultPopup(nis, totalScore, scorePG, scoreKompleks, scoreKategori) {
