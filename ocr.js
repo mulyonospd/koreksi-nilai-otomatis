@@ -24,10 +24,12 @@ async function extractNISFromImage() {
          * Pada implementasi nyata, koordinat ini harus dinamis mengambil data dari kontur 
          * kotak tabel OpenCV di vision.js agar letaknya presisi meskipun kertas agak bergeser.
          */
-        const cropX = videoElement.videoWidth * 0.5;   // Estimasi: Area nomor ada di paruh kanan atas
-        const cropY = videoElement.videoHeight * 0.05; // Estimasi: 5% dari batas atas kertas
-        const cropWidth = videoElement.videoWidth * 0.4;
-        const cropHeight = videoElement.videoHeight * 0.1;
+        // Koordinat pemotongan kamera untuk diarahkan ke area tulisan "Nomor"
+        // Sesuaikan rasio ini. Saat ini diatur menembak pojok kanan atas layar.
+        const cropX = videoElement.videoWidth * 0.6;   // Mulai dari 60% layar ke kanan
+        const cropY = videoElement.videoHeight * 0.02; // Mulai dari 2% layar dari atas
+        const cropWidth = videoElement.videoWidth * 0.35; // Lebar potongan 35%
+        const cropHeight = videoElement.videoHeight * 0.08; // Tinggi potongan 8%
 
         tempCanvas.width = cropWidth;
         tempCanvas.height = cropHeight;
