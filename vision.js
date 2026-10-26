@@ -52,6 +52,15 @@ function find4CornerMarkers(thresh) {
 function scanFrame(videoElement, ctxOverlay, width, height) {
     if (!window.cvIsLoaded) return; 
 
+    // Jika sedang dalam masa jeda 1.5 detik (cooldown), biarkan kamera jalan tanpa mendeteksi
+    if (AppState.mode === 'cooldown') {
+        ctxOverlay.clearRect(0, 0, width, height);
+        ctxOverlay.strokeStyle = "rgba(255, 255, 0, 0.6)"; // Kotak kuning penanda siap ganti kertas
+        ctxOverlay.lineWidth = 2;
+        ctxOverlay.strokeRect(width * 0.05, height * 0.05, width * 0.9, height * 0.9);
+        return;
+    }
+
     if (!srcMat) {
         srcMat = new cv.Mat(height, width, cv.CV_8UC4);
         grayMat = new cv.Mat(height, width, cv.CV_8UC1);
